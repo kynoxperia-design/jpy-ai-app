@@ -1,6 +1,44 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import datetime
+
+# --- 【ここからCSS設定】 ---
+st.set_page_config(page_title="FX-AI Signal", layout="centered")
+
+st.markdown("""
+    <style>
+    /* 画面全体の背景色と文字色を強制的に固定（ダークモード対策） */
+    .stApp {
+        background-color: #f0f2f6 !important;
+    }
+    
+    /* 全ての文字色を黒に近い色に固定 */
+    h1, h2, h3, p, span, div, label {
+        color: #1f1f1f !important;
+    }
+
+    /* 指標などのテーブルの中身も見やすく固定 */
+    .stTable td, .stTable th {
+        color: #1f1f1f !important;
+        background-color: #ffffff !important;
+    }
+
+    /* 予測カード（Metric）の背景を白に固定 */
+    [data-testid="stMetric"] {
+        background-color: #ffffff !important;
+        border-radius: 10px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+# --- 【ここまでCSS設定】 ---
+
+# この下に、以前作った「日本時間の取得」や「現在価格の表示」を続けて書きます
+import streamlit as st
+import yfinance as yf
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import datetime
 
