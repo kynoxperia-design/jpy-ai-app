@@ -99,12 +99,19 @@ for i, (label, p, prob) in enumerate(results):
     with cols[i]:
         st.metric(label, "📈 上昇" if p == 1 else "📉 下落", f"{max(prob)*100:.1f}%")
 
-# --- 4. 経済指標 ---
+# --- 4. 経済指標 (カレンダーへのリンク) ---
 st.divider()
-st.subheader("📅 重要指標 (日本時間)")
-events = [
-    {"時間": "21:30", "重要度": "🔥🔥🔥", "指標名": "米・雇用統計 / CPI"},
-    {"時間": "23:00", "重要度": "🔥🔥", "指標名": "米・景気指数"},
-    {"時間": "04:00", "重要度": "🔥🔥🔥", "指標名": "FOMC政策金利"},
-]
-st.table(pd.DataFrame(events))
+st.subheader("📅 経済指標を確認")
+
+st.info("信頼できる外部サイトで最新のスケジュールをチェックしましょう。")
+
+# ボタンを配置
+st.link_button("🌐 GMO外貨 経済指標カレンダー", "https://www.gaikaex.com/gaikaex/mark/calendar/", use_container_width=True)
+
+col_link1, col_link2 = st.columns(2)
+with col_link1:
+    st.link_button("📊 Yahoo!指標", "https://finance.yahoo.co.jp/fx/center/calendar/", use_container_width=True)
+with col_link2:
+    st.link_button("🔍 みんかぶ指標", "https://fx.minkabu.jp/indicators", use_container_width=True)
+
+st.caption("※GMO外貨は重要度や通貨別の絞り込みがしやすくおすすめです。")
