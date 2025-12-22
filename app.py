@@ -36,6 +36,13 @@ st.markdown("""
 # --- 【ここまでCSS設定】 ---
 
 # この下に、以前作った「日本時間の取得」や「現在価格の表示」を続けて書きます
+
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+import datetime
+
 # --- ページ設定 ---
 st.set_page_config(page_title="FX-AI Signal", layout="centered")
 
