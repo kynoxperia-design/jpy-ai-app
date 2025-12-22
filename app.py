@@ -46,6 +46,22 @@ now = now_jst.strftime('%Y-%m-%d %H:%M')
 st.subheader(f"📊 最終更新 (日本時間): {now}")
 st.subheader(f"📊 現在時刻: {now} の診断結果")
 
+# --- 現在価格の取得と表示 ---
+# 直近の価格データを取得
+raw_data = yf.download("JPY=X", period="1d", interval="1m", progress=False)
+current_price = raw_data['Close'].iloc[-1]
+
+# MultiIndex（2層構造）になっている場合の対策
+if isinstance(current_price, pd.Series):
+    current_price = current_price.iloc[0]
+
+# 大きく表示
+st.markdown(f"""
+    <div style="background-color: #1e1e1e; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
+        <h2 style="color: white; margin: 0; font-size: 1.2rem;">現在のドル円 (USD/JPY)</h2>
+        <h1 style="color: #00ff00; margin: 0; font-size: 3.5rem;">{current_price:.2f} <span style="font-size: 1.5rem;">円</span></h1>
+    </div>
+""", unsafe_allow_html=True)
 # 1. 総合判断（サマリー）
 col_main = st.columns(1)[0]
 preds = []
