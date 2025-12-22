@@ -18,6 +18,8 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🦅 FX-AI リアルタイム診断")
+if st.button('🔄 今すぐ最新データで再計算'):
+    st.rerun()
 
 # --- 予測ロジック ---
 def predict_logic(ticker, interval, period, future_steps):
@@ -37,8 +39,11 @@ def predict_logic(ticker, interval, period, future_steps):
     return model.predict(X.tail(1))[0], model.predict_proba(X.tail(1))[0]
 
 # --- メインコンテンツ ---
-now = datetime.datetime.now().strftime('%H:%M')
-st.subheader(f"📊 現在時刻: {now} の診断結果")
+# サーバーの時間に9時間を足して日本時間にする
+now_jst = datetime.datetime.now() + datetime.timedelta(hours=9)
+now = now_jst.strftime('%Y-%m-%d %H:%M')
+
+st.subheader(f"📊 最終更新 (日本時間): {now}")st.subheader(f"📊 現在時刻: {now} の診断結果")
 
 # 1. 総合判断（サマリー）
 col_main = st.columns(1)[0]
