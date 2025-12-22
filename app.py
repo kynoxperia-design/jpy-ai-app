@@ -88,4 +88,43 @@ timeframes = {
     "10分後": ("1m", "1d", 10), 
     "1時間後": ("5m", "5d", 12), 
     "4時間後": ("15m", "15d", 16), 
-    "1日後": ("1d", "2y
+    "1日後": ("1d", "2y", 1)
+}
+
+preds, results = [], []
+for label, params in timeframes.items():
+    p, prob = predict_logic("JPY=X", params[0], params[1], params[2])
+    preds.append(p)
+    results.append((label, p, prob))
+
+# 総合判断表示
+up_ratio = sum(preds) / len(preds)
+if up_ratio > 0.7:
+    st.success("🔥 【強い買い】上昇の可能性が高いです")
+elif up_ratio < 0.3:
+    st.error("❄️ 【強い売り】下落に警戒してください")
+else:
+    st.warning("⚖️ 【様子見】方向感が定まっていません")
+
+# 予測結果をカードで横並び表示（スマホでは自動で折り返されます）
+cols = st.columns(4)
+for i, (label, p, prob) in enumerate(results):
+    with cols[i]:
+        direction = "上昇" if p == 1 else "下落"
+        icon = "📈" if p == 1 else "📉"
+        st.metric(label, f"{icon}{direction}", f"{max(prob)*100:.1f}%")
+
+# --- 4. 経済指標 (カレンダーへのリンク) ---
+st.divider()
+st.subheader("📅 経済指標を確認")
+st.info("最新のスケジュールは以下の公式サイトでチェック！")
+
+st.link_button("🌐 GMO外貨 経済指標カレンダー", "https://www.gaikaex.com/gaikaex/mark/calendar/", use_container_width=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.link_button("📊 Yahoo!指標", "https://finance.yahoo.co.jp/fx/center/calendar/", use_container_width=True)
+with col2:
+    st.link_button("🔍 みんかぶ指標", "https://fx.minkabu.jp/indicators", use_container_width=True)
+
+st.caption("※経済指標の発表前後は急激な変動に注意してください。")
