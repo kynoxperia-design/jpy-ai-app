@@ -4,37 +4,34 @@ import pandas as pd
 import datetime
 from sklearn.ensemble import RandomForestClassifier
 
-# --- 1. デザイン設定（ダークモードで統一） ---
+# --- 1. デザイン設定（ダークモード・スマホ最適化） ---
 st.set_page_config(page_title="FX-AI Dashboard", layout="centered")
 
 st.markdown("""
     <style>
     /* 全体を黒背景、文字を白に固定 */
     .stApp { background-color: #0e1117 !important; }
-    
-    /* あらゆる場所の文字を白にする */
     h1, h2, h3, p, span, label, .stMarkdown { color: #ffffff !important; }
     
-    /* 予測カードの背景を濃いグレー、文字を白に */
+    /* 予測カードの設定 */
     [data-testid="stMetric"] {
         background-color: #1e2128 !important;
         border: 1px solid #333;
         border-radius: 10px;
-        padding: 15px;
+        padding: 10px;
     }
     [data-testid="stMetricLabel"] { color: #aaaaaa !important; }
-    [data-testid="stMetricValue"] { color: #ffffff !important; }
-
+    
     /* テーブルの設定 */
     .stTable { background-color: #1e2128 !important; color: #ffffff !important; }
     .stTable td, .stTable th { color: #ffffff !important; border-bottom: 1px solid #333 !important; }
     
-    /* ボタンの文字色 */
-    .stButton>button { color: #ffffff !important; border: 1px solid #444; background-color: #262730; }
+    /* ボタンの色を調整 */
+    .stButton>button { width: 100%; color: #ffffff !important; background-color: #262730; border: 1px solid #444; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 日本時間と現在価格の取得 ---
+# --- 2. 時間と価格の取得 ---
 jst_now = datetime.datetime.now() + datetime.timedelta(hours=9)
 current_time_str = jst_now.strftime('%Y-%m-%d %H:%M')
 
@@ -44,21 +41,25 @@ st.caption(f"最終更新 (日本時間): {current_time_str}")
 if st.button('🔄 データを更新'):
     st.rerun()
 
-# 価格取得
-raw_data = yf.download("JPY=X", period="1d", interval="1m", progress=False)
-current_price = raw_data['Close'].iloc[-1]
-if isinstance(current_price, pd.Series):
-    current_price = current_price.iloc[0]
+# 現在価格取得
+try:
+    raw_data = yf.download("JPY=X", period="1d", interval="1m", progress=False)
+    current_price = raw_data['Close'].iloc[-1]
+    if isinstance(current_price, pd.Series):
+        current_price = current_price.iloc[0]
+except:
+    current_price = 0.0
 
-# 現在価格表示
+# 現在価格表示（ダークモード対応）
 st.markdown(f"""
-    <div style="background-color: #000000 !important; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 20px; border: 1px solid #00ff00;">
-        <p style="color: #00ff00 !important; margin: 0; font-size: 1rem;">USD/JPY 現在価格</p>
+    <div style="background-color: #000000 !important; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 10px; border: 2px solid #00ff00;">
+        <p style="color: #00ff00 !important; margin: 0; font-size: 1rem; font-weight: bold;">USD/JPY 現在価格</p>
         <p style="color: #00ff00 !important; margin: 0; font-size: 3.5rem; font-weight: bold;">{current_price:.2f}</p>
     </div>
 """, unsafe_allow_html=True)
-# --- 現在価格表示のすぐ下に追加 ---
-st.link_button("📈 XE.com でリアルタイムチャートを見る", 
+
+# XEチャートへのリンクボタン
+st.link_button("📈 XE.com リアルタイムチャートを見る", 
                "https://www.xe.com/ja/currencycharts/?from=USD&to=JPY", 
                use_container_width=True)
 
@@ -82,40 +83,9 @@ def predict_logic(ticker, interval, period, future_steps):
     except:
         return 0, [0.5, 0.5]
 
-# 診断とカード表示
-timeframes = {"10分後": ("1m", "1d", 10), "1時間後": ("5m", "5d", 12), "1日後": ("1d", "2y", 1)}
-preds, results = [], []
-for label, params in timeframes.items():
-    p, prob = predict_logic("JPY=X", params[0], params[1], params[2])
-    preds.append(p)
-    results.append((label, p, prob))
-
-up_ratio = sum(preds) / len(preds)
-if up_ratio > 0.7:
-    st.success("🔥 【強い買い】")
-elif up_ratio < 0.3:
-    st.error("❄️ 【強い売り】")
-else:
-    st.warning("⚖️ 【様子見】")
-
-cols = st.columns(3)
-for i, (label, p, prob) in enumerate(results):
-    with cols[i]:
-        st.metric(label, "📈 上昇" if p == 1 else "📉 下落", f"{max(prob)*100:.1f}%")
-
-# --- 4. 経済指標 (カレンダーへのリンク) ---
-st.divider()
-st.subheader("📅 経済指標を確認")
-
-st.info("信頼できる外部サイトで最新のスケジュールをチェックしましょう。")
-
-# ボタンを配置
-st.link_button("🌐 GMO外貨 経済指標カレンダー", "https://www.gaikaex.com/gaikaex/mark/calendar/", use_container_width=True)
-
-col_link1, col_link2 = st.columns(2)
-with col_link1:
-    st.link_button("📊 Yahoo!指標", "https://finance.yahoo.co.jp/fx/center/calendar/", use_container_width=True)
-with col_link2:
-    st.link_button("🔍 みんかぶ指標", "https://fx.minkabu.jp/indicators", use_container_width=True)
-
-st.caption("※GMO外貨は重要度や通貨別の絞り込みがしやすくおすすめです。")
+# 4つの時間軸で診断実行
+timeframes = {
+    "10分後": ("1m", "1d", 10), 
+    "1時間後": ("5m", "5d", 12), 
+    "4時間後": ("15m", "15d", 16), 
+    "1日後": ("1d", "2y
