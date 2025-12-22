@@ -57,6 +57,10 @@ st.markdown(f"""
         <p style="color: #00ff00 !important; margin: 0; font-size: 3.5rem; font-weight: bold;">{current_price:.2f}</p>
     </div>
 """, unsafe_allow_html=True)
+# --- 現在価格表示のすぐ下に追加 ---
+st.link_button("📈 XE.com でリアルタイムチャートを見る", 
+               "https://www.xe.com/ja/currencycharts/?from=USD&to=JPY", 
+               use_container_width=True)
 
 # --- 3. 予測ロジック ---
 def predict_logic(ticker, interval, period, future_steps):
