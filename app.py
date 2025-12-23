@@ -27,7 +27,6 @@ st.markdown("""
 jst_now = datetime.datetime.now() + datetime.timedelta(hours=9)
 current_time_str = jst_now.strftime('%Y-%m-%d %H:%M')
 
-# 現在価格の取得（リトライ機能付き）
 def get_latest_price():
     try:
         data = yf.download("JPY=X", period="1d", interval="1m", progress=False)
@@ -45,7 +44,7 @@ st.caption(f"最終更新 (日本時間): {current_time_str}")
 st.markdown(f"""
     <div style="background-color: #000000 !important; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 10px; border: 2px solid #00ff00;">
         <p style="color: #00ff00 !important; margin: 0; font-size: 1rem; font-weight: bold;">USD/JPY 現在価格</p>
-        <p style="color: #00ff00 !important; margin: 0; font-size: 3.8rem; font-weight: bold;">{current_price:.2f}</p>
+        <p style="color: #00ff00 !important; margin: 0; font-size: 3.8rem; font-weight: bold;">{float(current_price):.2f}</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -62,33 +61,26 @@ st.subheader("🕰️ 過去レートと比較 (勢いの確認)")
 
 def get_past_price_v2(period, interval):
     try:
-        # 少し長めにデータを取って、その一番古いデータを「過去」とする
         p_data = yf.download("JPY=X", period=period, interval=interval, progress=False)
         if len(p_data) > 0:
-            return p_data['Close'].iloc[0] # 期間内の最初の価格
-        return current_price
+            val = p_data['Close'].iloc[0]
+            return float(val)
+        return float(current_price)
     except:
-        return current_price
+        return float(current_price)
 
-# 正確な比較のために期間を調整
 past_list = {
-    "10分前": get_past_price_v2("30m", "1m"), # 30分間のデータの最初 = 約30分前
-    "1時間前": get_past_price_v2("2d", "1h"), # 2日間の1時間足の最初 = 約1日前になってしまうのを防ぐため細かく調整
-    "4時間前": get_past_price_v2("5d", "1h"),
+    "10分前": get_past_price_v2("30m", "1m"),
+    "1時間前": get_past_price_v2("2h", "5m"),
+    "4時間前": get_past_price_v2("8h", "15m"),
     "1日前": get_past_price_v2("5d", "1d")
 }
 
-# 1時間前と4時間前をより正確にするための再調整
-past_list["1時間前"] = get_past_price_v2("2h", "5m") 
-past_list["4時間前"] = get_past_price_v2("8h", "15m")
-
 cols1 = st.columns(4)
 for i, (label, p_val) in enumerate(past_list.items()):
-    # 取得した値がSeriesだった場合の対策
-    display_p = float(p_val)
-    diff = current_price - display_p
+    diff = float(current_price) - p_val
     with cols1[i]:
-        st.metric(label, f"{display_p:.2f}", f"{diff:+.2f}")
+        st.metric(label, f"{p_val:.2f}", f"{diff:+.2f}")
 
 # 【下段：AI未来予測】
 st.divider()
@@ -119,7 +111,6 @@ for label, params in timeframes.items():
     preds.append(p)
     results.append((label, p, prob))
 
-# 総合判断
 up_ratio = sum(preds) / len(preds)
 if up_ratio > 0.7: st.success("🔥 【強い買い】上昇トレンドの可能性が高い")
 elif up_ratio < 0.3: st.error("❄️ 【強い売り】下落に注意が必要")
@@ -137,3 +128,4 @@ st.link_button("🌐 GMO外貨 経済指標カレンダー", "https://www.gaikae
 c1, c2 = st.columns(2)
 with c1: st.link_button("📊 Yahoo!指標", "https://finance.yahoo.co.jp/fx/center/calendar/", use_container_width=True)
 with c2: st.link_button("🔍 みんかぶ指標", "https://fx.minkabu.jp/indicators", use_container_width=True)
+st.caption("※経済指標の発表前後は急激な変動に注意してください。")
