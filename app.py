@@ -27,14 +27,17 @@ st.markdown("""
 jst_now = datetime.datetime.now() + datetime.timedelta(hours=9)
 current_time_str = jst_now.strftime('%Y-%m-%d %H:%M')
 
-try:
-    raw_data = yf.download("JPY=X", period="1d", interval="1m", progress=False)
-    current_price = raw_data['Close'].iloc[-1]
-    if isinstance(current_price, pd.Series): current_price = current_price.iloc[0]
-except:
-    current_price = 0.0
+# 現在価格の取得（リトライ機能付き）
+def get_latest_price():
+    try:
+        data = yf.download("JPY=X", period="1d", interval="1m", progress=False)
+        return data['Close'].iloc[-1]
+    except:
+        return 0.0
 
-# --- 3. 画面レイアウト開始 ---
+current_price = get_latest_price()
+
+# --- 3. 画面レイアウト ---
 st.title("🦅 FX-AI リアルタイム診断")
 st.caption(f"最終更新 (日本時間): {current_time_str}")
 
@@ -57,26 +60,35 @@ if st.button('🔄 情報を更新'):
 st.divider()
 st.subheader("🕰️ 過去レートと比較 (勢いの確認)")
 
-def get_past_data(period, interval):
+def get_past_price_v2(period, interval):
     try:
+        # 少し長めにデータを取って、その一番古いデータを「過去」とする
         p_data = yf.download("JPY=X", period=period, interval=interval, progress=False)
-        val = p_data['Close'].iloc[0]
-        if isinstance(val, pd.Series): val = val.iloc[0]
-        return val
-    except: return current_price
+        if len(p_data) > 0:
+            return p_data['Close'].iloc[0] # 期間内の最初の価格
+        return current_price
+    except:
+        return current_price
 
+# 正確な比較のために期間を調整
 past_list = {
-    "10分前": get_past_data("15m", "1m"),
-    "1時間前": get_past_data("90m", "5m"),
-    "4時間前": get_past_data("5h", "15m"),
-    "1日前": get_past_data("2d", "1d")
+    "10分前": get_past_price_v2("30m", "1m"), # 30分間のデータの最初 = 約30分前
+    "1時間前": get_past_price_v2("2d", "1h"), # 2日間の1時間足の最初 = 約1日前になってしまうのを防ぐため細かく調整
+    "4時間前": get_past_price_v2("5d", "1h"),
+    "1日前": get_past_price_v2("5d", "1d")
 }
+
+# 1時間前と4時間前をより正確にするための再調整
+past_list["1時間前"] = get_past_price_v2("2h", "5m") 
+past_list["4時間前"] = get_past_price_v2("8h", "15m")
 
 cols1 = st.columns(4)
 for i, (label, p_val) in enumerate(past_list.items()):
-    diff = current_price - p_val
+    # 取得した値がSeriesだった場合の対策
+    display_p = float(p_val)
+    diff = current_price - display_p
     with cols1[i]:
-        st.metric(label, f"{p_val:.2f}", f"{diff:+.2f}")
+        st.metric(label, f"{display_p:.2f}", f"{diff:+.2f}")
 
 # 【下段：AI未来予測】
 st.divider()
