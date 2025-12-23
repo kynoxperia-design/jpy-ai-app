@@ -4,28 +4,41 @@ import pandas as pd
 import datetime
 from sklearn.ensemble import RandomForestClassifier
 
-# --- 1. デザイン設定 ---
+# --- 1. デザイン設定（文字サイズとレイアウトの統一） ---
 st.set_page_config(page_title="FX-AI Dash", layout="centered")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117 !important; }
     h1, h2, h3, p, span, label, .stMarkdown { color: #ffffff !important; }
+    
+    /* メトリック（カード）の枠サイズを固定 */
     [data-testid="stMetric"] {
         background-color: #1e2128 !important;
         border: 1px solid #333;
         border-radius: 10px;
         padding: 10px;
+        min-height: 100px;
     }
-    /* 過去セクションの背景を少し変えて区別しやすくする */
-    .past-box {
-        background-color: #161a21;
-        padding: 10px;
-        border-radius: 10px;
-        border-left: 3px solid #555;
-        margin-bottom: 10px;
+    
+    /* 見出し（10分、1時間など）のサイズ統一 */
+    .time-header {
+        font-size: 1.2rem;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 15px;
+        color: #00ff00;
     }
-    .stButton>button { width: 100%; color: #ffffff !important; background-color: #262730; }
+
+    /* セクションラベルのサイズ統一 */
+    .section-label {
+        font-size: 0.8rem;
+        color: #aaaaaa;
+        margin-bottom: 5px;
+        text-align: center;
+    }
+    
+    .stButton>button { width: 100%; color: #ffffff !important; background-color: #262730; border: 1px solid #444; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -61,11 +74,11 @@ def predict_at_point(ticker, interval, period, future_steps, offset=0):
 
 # --- 4. 画面表示 ---
 st.title("🦅 FX-AI 診断パネル")
-st.caption(f"日本時間: {jst_now.strftime('%Y-%m-%d %H:%M')}")
+st.caption(f"最終更新 (日本時間): {jst_now.strftime('%H:%M')}")
 
 # 現在価格
 st.markdown(f"""
-    <div style="background-color: #000000; padding: 15px; border-radius: 15px; text-align: center; border: 2px solid #00ff00; margin-bottom: 20px;">
+    <div style="background-color: #000000; padding: 15px; border-radius: 15px; text-align: center; border: 2px solid #00ff00; margin-bottom: 10px;">
         <p style="color: #00ff00; margin: 0; font-size: 1rem;">USD/JPY 現在価格</p>
         <p style="color: #00ff00; margin: 0; font-size: 3.2rem; font-weight: bold;">{current_price:.2f}</p>
     </div>
@@ -76,37 +89,37 @@ if st.button('🔄 情報を更新'): st.rerun()
 
 st.divider()
 
-# 【ここがメイン：過去と未来の横並び表示】
+# 【メイン：過去と現在の比較】
 timeframes = {
-    "10分": {"params": ("1m","1d",10), "offset": 10},
-    "1時間": {"params": ("5m","5d",12), "offset": 12},
-    "4時間": {"params": ("15m","15d",16), "offset": 16},
-    "1日": {"params": ("1d","2y",1), "offset": 1}
+    "10分軸": {"params": ("1m","1d",10), "offset": 10},
+    "1時間軸": {"params": ("5m","5d",12), "offset": 12},
+    "4時間軸": {"params": ("15m","15d",16), "offset": 16},
+    "1日軸": {"params": ("1d","2y",1), "offset": 1}
 }
 
 cols = st.columns(4)
 
 for i, (label, cfg) in enumerate(timeframes.items()):
     with cols[i]:
-        st.subheader(label)
+        st.markdown(f'<p class="time-header">{label}</p>', unsafe_allow_html=True)
         
-        # --- 過去パート ---
+        # --- 過去実績セクション ---
+        st.markdown(f'<p class="section-label">過去の実績</p>', unsafe_allow_html=True)
         p_val, p_dir, _ = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=cfg["offset"])
         diff = current_price - p_val
-        st.markdown(f"**← {label}前**")
-        st.metric("実績", f"{p_val:.2f}", f"{diff:+.2f}")
+        st.metric("", f"{p_val:.2f}", f"{diff:+.2f}")
         st.caption("📈上昇予測" if p_dir == 1 else "📉下落予測")
         
-        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True) # スペース
         
-        # --- 未来パート ---
+        # --- 現在予測セクション ---
+        st.markdown(f'<p class="section-label">現在の予測</p>', unsafe_allow_html=True)
         _, f_dir, f_prob = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=0)
-        st.markdown(f"**→ {label}後**")
-        st.metric("予測", "📈上昇" if f_dir == 1 else "📉下落", f"{max(f_prob)*100:.1f}%")
+        st.metric("", "📈上昇" if f_dir == 1 else "📉下落", f"{max(f_prob)*100:.1f}%")
 
 # --- 5. 外部リンク ---
 st.divider()
-st.subheader("📅 経済指標")
+st.subheader("📅 経済指標リンク")
 st.link_button("🌐 GMO外貨 指標カレンダー", "https://www.gaikaex.com/gaikaex/mark/calendar/", use_container_width=True)
 c1, c2 = st.columns(2)
 with c1: st.link_button("📊 Yahoo!", "https://finance.yahoo.co.jp/fx/center/calendar/", use_container_width=True)
