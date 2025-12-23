@@ -4,7 +4,7 @@ import pandas as pd
 import datetime
 from sklearn.ensemble import RandomForestClassifier
 
-# --- 1. デザイン設定 ---
+# --- 1. デザイン設定（全カードの統一） ---
 st.set_page_config(page_title="FX-AI Dash", layout="centered")
 
 st.markdown("""
@@ -12,36 +12,40 @@ st.markdown("""
     .stApp { background-color: #0e1117 !important; }
     h1, h2, h3, p, span, label, .stMarkdown { color: #ffffff !important; }
     
+    /* 全てのメトリックカードのスタイルを統一 */
     [data-testid="stMetric"] {
         background-color: #1e2128 !important;
         border: 1px solid #333;
         border-radius: 10px;
         padding: 10px;
         min-height: 100px;
+        text-align: center;
     }
     
     .time-header {
         font-size: 1.1rem;
         font-weight: bold;
         text-align: center;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
         color: #00ff00;
-        border-bottom: 1px solid #333;
+        border-bottom: 2px solid #333;
+        padding-bottom: 5px;
     }
 
     .section-label {
         font-size: 0.8rem;
         color: #aaaaaa;
-        margin-top: 10px;
+        margin-top: 15px;
         margin-bottom: 5px;
         text-align: center;
+        font-weight: bold;
     }
     
     .price-subtext {
         font-size: 0.85rem;
         color: #888888;
         text-align: center;
-        margin-top: -5px;
+        margin-top: -8px;
         margin-bottom: 10px;
     }
     
@@ -110,21 +114,23 @@ for i, (label, cfg) in enumerate(timeframes.items()):
     with cols[i]:
         st.markdown(f'<p class="time-header">{label}軸</p>', unsafe_allow_html=True)
         
-        # --- 答え合わせセクション ---
+        # --- これまでの動き（表示方法を予測カードと統一） ---
         st.markdown(f'<p class="section-label">これまでの動き</p>', unsafe_allow_html=True)
         p_val, p_dir, _ = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=cfg["offset"])
         diff = current_price - p_val
         
-        # 表記を「現在」と「〇〇前」に変更
-        st.metric("", f"現在:{current_price:.2f}", f"{diff:+.2f}")
-        st.markdown(f'<p class="price-subtext">{label}前: {p_val:.2f}</p>', unsafe_allow_html=True)
+        # 予測と同じ「アイコン＋状態」の形式で表示
+        status_text = "📈上昇中" if diff > 0 else "📉下落中"
+        st.metric("", status_text, f"{diff:+.2f}")
+        st.markdown(f'<p class="price-subtext">現在:{current_price:.2f} / 前:{p_val:.2f}</p>', unsafe_allow_html=True)
         st.caption("📈当時の予測:上" if p_dir == 1 else "📉当時の予測:下")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- 未来予測セクション ---
+        # --- AIの最新予測（統一デザイン） ---
         st.markdown(f'<p class="section-label">AIの最新予測</p>', unsafe_allow_html=True)
         _, f_dir, f_prob = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=0)
+        
         st.metric("", "📈上昇" if f_dir == 1 else "📉下落", f"{max(f_prob)*100:.1f}%")
 
 # --- 5. 外部リンク ---
