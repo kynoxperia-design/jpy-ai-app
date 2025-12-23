@@ -4,7 +4,7 @@ import pandas as pd
 import datetime
 from sklearn.ensemble import RandomForestClassifier
 
-# --- 1. デザイン設定（文字サイズとレイアウトの統一） ---
+# --- 1. デザイン設定 ---
 st.set_page_config(page_title="FX-AI Dash", layout="centered")
 
 st.markdown("""
@@ -12,30 +12,38 @@ st.markdown("""
     .stApp { background-color: #0e1117 !important; }
     h1, h2, h3, p, span, label, .stMarkdown { color: #ffffff !important; }
     
-    /* メトリック（カード）の枠サイズを固定 */
+    /* カードの高さとデザインを統一 */
     [data-testid="stMetric"] {
         background-color: #1e2128 !important;
         border: 1px solid #333;
         border-radius: 10px;
         padding: 10px;
-        min-height: 100px;
+        min-height: 110px;
     }
     
-    /* 見出し（10分、1時間など）のサイズ統一 */
     .time-header {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         font-weight: bold;
         text-align: center;
         margin-bottom: 15px;
         color: #00ff00;
+        border-bottom: 1px solid #00ff00;
     }
 
-    /* セクションラベルのサイズ統一 */
     .section-label {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         color: #aaaaaa;
+        margin-top: 10px;
         margin-bottom: 5px;
         text-align: center;
+        font-weight: bold;
+    }
+    
+    .price-subtext {
+        font-size: 0.8rem;
+        color: #dddddd;
+        text-align: center;
+        margin: 0;
     }
     
     .stButton>button { width: 100%; color: #ffffff !important; background-color: #262730; border: 1px solid #444; }
@@ -69,32 +77,32 @@ def predict_at_point(ticker, interval, period, future_steps, offset=0):
         y = df['Target']
         model = RandomForestClassifier(n_estimators=50, random_state=42)
         model.fit(X.iloc[:-future_steps], y.iloc[:-future_steps])
-        return df['Price'].iloc[-1], model.predict(X.tail(1))[0], model.predict_proba(X.tail(1))[0]
+        return float(df['Price'].iloc[-1]), model.predict(X.tail(1))[0], model.predict_proba(X.tail(1))[0]
     except: return 0.0, 0, [0.5, 0.5]
 
 # --- 4. 画面表示 ---
 st.title("🦅 FX-AI 診断パネル")
-st.caption(f"最終更新 (日本時間): {jst_now.strftime('%H:%M')}")
+st.caption(f"最終更新: {jst_now.strftime('%H:%M')}")
 
-# 現在価格
+# メイン現在価格表示
 st.markdown(f"""
     <div style="background-color: #000000; padding: 15px; border-radius: 15px; text-align: center; border: 2px solid #00ff00; margin-bottom: 10px;">
-        <p style="color: #00ff00; margin: 0; font-size: 1rem;">USD/JPY 現在価格</p>
+        <p style="color: #00ff00; margin: 0; font-size: 1rem;">USD/JPY リアルタイム価格</p>
         <p style="color: #00ff00; margin: 0; font-size: 3.2rem; font-weight: bold;">{current_price:.2f}</p>
     </div>
 """, unsafe_allow_html=True)
 
-st.link_button("📈 XE.com リアルタイムチャート", "https://www.xe.com/ja/currencycharts/?from=USD&to=JPY", use_container_width=True)
+st.link_button("📈 XE.com チャートを確認", "https://www.xe.com/ja/currencycharts/?from=USD&to=JPY", use_container_width=True)
 if st.button('🔄 情報を更新'): st.rerun()
 
 st.divider()
 
-# 【メイン：過去と現在の比較】
+# 【メインレイアウト：4つの時間軸】
 timeframes = {
-    "10分軸": {"params": ("1m","1d",10), "offset": 10},
-    "1時間軸": {"params": ("5m","5d",12), "offset": 12},
-    "4時間軸": {"params": ("15m","15d",16), "offset": 16},
-    "1日軸": {"params": ("1d","2y",1), "offset": 1}
+    "10分軸": {"params": ("1m","1d",10), "offset": 10, "past_label": "10分前"},
+    "1時間軸": {"params": ("5m","5d",12), "offset": 12, "past_label": "1時間前"},
+    "4時間軸": {"params": ("15m","15d",16), "offset": 16, "past_label": "4時間前"},
+    "1日軸": {"params": ("1d","2y",1), "offset": 1, "past_label": "1日前"}
 }
 
 cols = st.columns(4)
@@ -104,16 +112,19 @@ for i, (label, cfg) in enumerate(timeframes.items()):
         st.markdown(f'<p class="time-header">{label}</p>', unsafe_allow_html=True)
         
         # --- 過去実績セクション ---
-        st.markdown(f'<p class="section-label">過去の実績</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="section-label">過去実績と現在</p>', unsafe_allow_html=True)
         p_val, p_dir, _ = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=cfg["offset"])
         diff = current_price - p_val
-        st.metric("", f"{p_val:.2f}", f"{diff:+.2f}")
-        st.caption("📈上昇予測" if p_dir == 1 else "📉下落予測")
         
-        st.markdown("<br>", unsafe_allow_html=True) # スペース
+        # 現在値と過去値を併記するためのカスタム表示
+        st.metric("", f"現:{current_price:.2f}", f"{diff:+.2f}")
+        st.markdown(f'<p class="price-subtext">始点: {p_val:.2f}</p>', unsafe_allow_html=True)
+        st.caption("📈上昇予測済" if p_dir == 1 else "📉下落予測済")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # --- 現在予測セクション ---
-        st.markdown(f'<p class="section-label">現在の予測</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="section-label">現在のAI予測</p>', unsafe_allow_html=True)
         _, f_dir, f_prob = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=0)
         st.metric("", "📈上昇" if f_dir == 1 else "📉下落", f"{max(f_prob)*100:.1f}%")
 
