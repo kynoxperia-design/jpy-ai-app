@@ -12,13 +12,12 @@ st.markdown("""
     .stApp { background-color: #0e1117 !important; }
     h1, h2, h3, p, span, label, .stMarkdown { color: #ffffff !important; }
     
-    /* カードの高さとデザインを統一 */
     [data-testid="stMetric"] {
         background-color: #1e2128 !important;
         border: 1px solid #333;
         border-radius: 10px;
         padding: 10px;
-        min-height: 110px;
+        min-height: 100px;
     }
     
     .time-header {
@@ -27,23 +26,23 @@ st.markdown("""
         text-align: center;
         margin-bottom: 15px;
         color: #00ff00;
-        border-bottom: 1px solid #00ff00;
+        border-bottom: 1px solid #333;
     }
 
     .section-label {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         color: #aaaaaa;
         margin-top: 10px;
         margin-bottom: 5px;
         text-align: center;
-        font-weight: bold;
     }
     
     .price-subtext {
-        font-size: 0.8rem;
-        color: #dddddd;
+        font-size: 0.85rem;
+        color: #888888;
         text-align: center;
-        margin: 0;
+        margin-top: -5px;
+        margin-bottom: 10px;
     }
     
     .stButton>button { width: 100%; color: #ffffff !important; background-color: #262730; border: 1px solid #444; }
@@ -84,7 +83,7 @@ def predict_at_point(ticker, interval, period, future_steps, offset=0):
 st.title("🦅 FX-AI 診断パネル")
 st.caption(f"最終更新: {jst_now.strftime('%H:%M')}")
 
-# メイン現在価格表示
+# メイン現在価格
 st.markdown(f"""
     <div style="background-color: #000000; padding: 15px; border-radius: 15px; text-align: center; border: 2px solid #00ff00; margin-bottom: 10px;">
         <p style="color: #00ff00; margin: 0; font-size: 1rem;">USD/JPY リアルタイム価格</p>
@@ -99,10 +98,10 @@ st.divider()
 
 # 【メインレイアウト：4つの時間軸】
 timeframes = {
-    "10分軸": {"params": ("1m","1d",10), "offset": 10, "past_label": "10分前"},
-    "1時間軸": {"params": ("5m","5d",12), "offset": 12, "past_label": "1時間前"},
-    "4時間軸": {"params": ("15m","15d",16), "offset": 16, "past_label": "4時間前"},
-    "1日軸": {"params": ("1d","2y",1), "offset": 1, "past_label": "1日前"}
+    "10分": {"params": ("1m","1d",10), "offset": 10},
+    "1時間": {"params": ("5m","5d",12), "offset": 12},
+    "4時間": {"params": ("15m","15d",16), "offset": 16},
+    "1日": {"params": ("1d","2y",1), "offset": 1}
 }
 
 cols = st.columns(4)
@@ -111,20 +110,20 @@ for i, (label, cfg) in enumerate(timeframes.items()):
     with cols[i]:
         st.markdown(f'<p class="time-header">{label}</p>', unsafe_allow_html=True)
         
-        # --- 過去実績セクション ---
-        st.markdown(f'<p class="section-label">過去実績と現在</p>', unsafe_allow_html=True)
+        # --- 答え合わせセクション ---
+        st.markdown(f'<p class="section-label">これまでの動き</p>', unsafe_allow_html=True)
         p_val, p_dir, _ = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=cfg["offset"])
         diff = current_price - p_val
         
-        # 現在値と過去値を併記するためのカスタム表示
-        st.metric("", f"現:{current_price:.2f}", f"{diff:+.2f}")
-        st.markdown(f'<p class="price-subtext">始点: {p_val:.2f}</p>', unsafe_allow_html=True)
-        st.caption("📈上昇予測済" if p_dir == 1 else "📉下落予測済")
+        # 表記を「今」と「〇〇前」に変更
+        st.metric("", f"今:{current_price:.2f}", f"{diff:+.2f}")
+        st.markdown(f'<p class="price-subtext">{label}前: {p_val:.2f}</p>', unsafe_allow_html=True)
+        st.caption("📈当時の予測:上" if p_dir == 1 else "📉当時の予測:下")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- 現在予測セクション ---
-        st.markdown(f'<p class="section-label">現在のAI予測</p>', unsafe_allow_html=True)
+        # --- 未来予測セクション ---
+        st.markdown(f'<p class="section-label">AIの最新予測</p>', unsafe_allow_html=True)
         _, f_dir, f_prob = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=0)
         st.metric("", "📈上昇" if f_dir == 1 else "📉下落", f"{max(f_prob)*100:.1f}%")
 
