@@ -4,7 +4,7 @@ import pandas as pd
 import datetime
 from sklearn.ensemble import RandomForestClassifier
 
-# --- 1. デザイン設定（全カードの統一） ---
+# --- 1. デザイン設定 ---
 st.set_page_config(page_title="FX-AI Dash", layout="centered")
 
 st.markdown("""
@@ -12,7 +12,6 @@ st.markdown("""
     .stApp { background-color: #0e1117 !important; }
     h1, h2, h3, p, span, label, .stMarkdown { color: #ffffff !important; }
     
-    /* 全てのメトリックカードのスタイルを統一 */
     [data-testid="stMetric"] {
         background-color: #1e2128 !important;
         border: 1px solid #333;
@@ -114,20 +113,21 @@ for i, (label, cfg) in enumerate(timeframes.items()):
     with cols[i]:
         st.markdown(f'<p class="time-header">{label}軸</p>', unsafe_allow_html=True)
         
-        # --- これまでの動き（表示方法を予測カードと統一） ---
+        # --- これまでの動き ---
         st.markdown(f'<p class="section-label">これまでの動き</p>', unsafe_allow_html=True)
         p_val, p_dir, _ = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=cfg["offset"])
         diff = current_price - p_val
         
-        # 予測と同じ「アイコン＋状態」の形式で表示
         status_text = "📈上昇中" if diff > 0 else "📉下落中"
         st.metric("", status_text, f"{diff:+.2f}")
-        st.markdown(f'<p class="price-subtext">現在:{current_price:.2f} / 前:{p_val:.2f}</p>', unsafe_allow_html=True)
+        
+        # 並びを「前 → 現在」に変更
+        st.markdown(f'<p class="price-subtext">前:{p_val:.2f} → 現在:{current_price:.2f}</p>', unsafe_allow_html=True)
         st.caption("📈当時の予測:上" if p_dir == 1 else "📉当時の予測:下")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- AIの最新予測（統一デザイン） ---
+        # --- AIの最新予測 ---
         st.markdown(f'<p class="section-label">AIの最新予測</p>', unsafe_allow_html=True)
         _, f_dir, f_prob = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=0)
         
