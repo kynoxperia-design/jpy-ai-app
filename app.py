@@ -108,15 +108,15 @@ cols = st.columns(4)
 
 for i, (label, cfg) in enumerate(timeframes.items()):
     with cols[i]:
-        st.markdown(f'<p class="time-header">{label}</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="time-header">{label}軸</p>', unsafe_allow_html=True)
         
         # --- 答え合わせセクション ---
         st.markdown(f'<p class="section-label">これまでの動き</p>', unsafe_allow_html=True)
         p_val, p_dir, _ = predict_at_point("JPY=X", cfg["params"][0], cfg["params"][1], cfg["params"][2], offset=cfg["offset"])
         diff = current_price - p_val
         
-        # 表記を「今」と「〇〇前」に変更
-        st.metric("", f"今:{current_price:.2f}", f"{diff:+.2f}")
+        # 表記を「現在」と「〇〇前」に変更
+        st.metric("", f"現在:{current_price:.2f}", f"{diff:+.2f}")
         st.markdown(f'<p class="price-subtext">{label}前: {p_val:.2f}</p>', unsafe_allow_html=True)
         st.caption("📈当時の予測:上" if p_dir == 1 else "📉当時の予測:下")
         
