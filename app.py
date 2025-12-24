@@ -5,7 +5,7 @@ import pandas_ta as ta
 import datetime
 from sklearn.ensemble import RandomForestClassifier
 
-# --- 1. ページ・デザイン設定 ---
+# --- 1. ページ設定 ---
 st.set_page_config(page_title="FX-AI Dashboard Ultra", layout="wide")
 
 st.markdown("""
@@ -15,78 +15,74 @@ st.markdown("""
     [data-testid="stMetric"] { background-color: #1e2128 !important; border: 1px solid #333; border-radius: 10px; padding: 10px; text-align: center; }
     [data-testid="stMetricValue"] { font-size: 1.3rem !important; font-weight: bold !important; color: #00ff00 !important; }
     .time-header { font-size: 1.2rem; font-weight: bold; text-align: center; color: #00ff00; border-bottom: 2px solid #00ff00; padding-bottom: 5px; margin-bottom: 10px; }
-    .section-label { font-size: 0.8rem; color: #aaaaaa; text-align: center; font-weight: bold; margin-top: 10px; text-transform: uppercase; }
+    .section-label { font-size: 0.8rem; color: #aaaaaa; text-align: center; font-weight: bold; margin-top: 10px; }
     .price-subtext { font-size: 0.85rem; color: #ffffff; text-align: center; background: #262730; border-radius: 5px; padding: 4px; margin-top: 5px; border: 1px solid #444; }
-    .tech-subtext { font-size: 0.75rem; color: #55aaff; text-align: center; margin-top: 6px; border-top: 1px solid #333; padding-top: 4px; }
-    .stButton>button { width: 100%; color: #ffffff !important; background-color: #262730; border: 1px solid #00ff00; font-weight: bold; }
+    .stButton>button { width: 100%; color: #ffffff !important; background-color: #262730; border: 1px solid #00ff00; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 安定データ取得エンジン ---
-@st.cache_data(ttl=60)
-def fetch_fx_data(ticker, period, interval):
+# --- 2. 修正版：データ取得ロジック ---
+def fetch_fx_data_fixed(ticker, period, interval):
     try:
-        df = yf.download(ticker, period=period, interval=interval, progress=False)
-        if df is None or df.empty: return None
+        # 修正：auto_adjust=Trueにして、列名を固定（Close, Openのみ）にする
+        df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
         
-        # MultiIndex(二重列名)の解消
+        if df.empty:
+            return None
+        
+        # yfinanceの最新仕様（MultiIndex）を強制的に平坦化
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        
-        # 列名のクレンジング
-        df.columns = [str(col).strip() for col in df.columns]
-        target_cols = ['Open', 'High', 'Low', 'Close']
-        df = df[target_cols].copy()
-        
-        # 数値型へ強制変換
-        for col in target_cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
             
-        return df.dropna()
-    except:
+        # 必要な列だけを抽出して確実に数値化
+        df = df[['Close', 'Open', 'High', 'Low']].copy()
+        df = df.apply(pd.to_numeric, errors='coerce').ffill()
+        
+        return df
+    except Exception as e:
+        st.error(f"データ取得エラー: {e}")
         return None
 
-# 現在のリアルタイムレートを取得
-data_main = fetch_fx_data("JPY=X", "5d", "1m")
-current_price = float(data_main['Close'].iloc[-1]) if data_main is not None else 0.0
-jst_now = datetime.datetime.now() + datetime.timedelta(hours=9)
-
-# --- 3. 高精度AI予測エンジン（マルチ指標版） ---
+# --- 3. 修正版：予測・比較エンジン ---
 def predict_engine_full(ticker, interval, period, future_steps, offset=0, is_daily=False):
-    df = fetch_fx_data(ticker, period, interval)
-    if df is None or len(df) < 50: return 0.0, 0, [0.5, 0.5], 50.0
+    df = fetch_fx_data_fixed(ticker, period, interval)
+    if df is None or len(df) < 20:
+        return 0.0, 0, [0.5, 0.5], 50.0
     
     try:
-        # 指標計算（RSI, MACD, ADX, EMA乖離）
+        # 指標計算
         df['RSI'] = ta.rsi(df['Close'], length=14)
         macd = ta.macd(df['Close'])
         df['MACD'] = macd.iloc[:, 0]
-        adx = ta.adx(df['High'], df['Low'], df['Close'], length=14)
-        df['ADX'] = adx['ADX_14']
         df['EMA200'] = ta.ema(df['Close'], length=min(200, len(df)-1))
         df['EMA_Dist'] = (df['Close'] - df['EMA200']) / df['Close']
-        
-        # 未来の判定（Target）
         df['Target'] = (df['Close'].shift(-future_steps) > df['Close']).astype(int)
         
-        # 過去価格の特定
-        idx = -(offset + 1) if is_daily else -offset
-        if abs(idx) > len(df): idx = -1
+        # 【最重要】過去レートの取得ロジック
+        # 最新の行は「現在の足」なので、offset=1なら1つ前の行を取得
+        if is_daily:
+            # 日足の場合、最新（今日）の1つ前が「昨日」
+            idx = -2 if len(df) >= 2 else -1
+        else:
+            # 分足などの場合
+            idx = -offset if len(df) >= offset else -1
+            
         past_price = float(df['Close'].iloc[idx])
         past_row = df.iloc[[idx]]
 
-        # AI学習
+        # 学習
         df_train = df.dropna()
-        features = ['RSI', 'MACD', 'ADX', 'EMA_Dist']
+        if len(df_train) < 10: return past_price, 0, [0.5, 0.5], 50.0
+        
+        features = ['RSI', 'MACD', 'EMA_Dist']
         X = df_train[features]
         y = df_train['Target']
         
-        # 学習モデルの構築（300本の決定木で高密度学習）
-        model = RandomForestClassifier(n_estimators=300, max_depth=12, random_state=42)
+        model = RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42)
         model.fit(X.iloc[:-future_steps], y.iloc[:-future_steps])
         
-        # 最新の予測実行
-        eval_row = df.dropna().tail(1) if offset == 0 else past_row.fillna(method='ffill')
+        # 最新の予測
+        eval_row = df.dropna().tail(1)
         pred = model.predict(eval_row[features])[0]
         prob = model.predict_proba(eval_row[features])[0]
         rsi_val = float(eval_row['RSI'].iloc[0])
@@ -95,12 +91,15 @@ def predict_engine_full(ticker, interval, period, future_steps, offset=0, is_dai
     except:
         return 0.0, 0, [0.5, 0.5], 50.0
 
-# --- 4. 画面表示メイン ---
-st.title("🦅 FX-AI Dashboard Ultra")
-st.caption(f"全時間軸・高精度予測モデル | 更新: {jst_now.strftime('%H:%M:%S')} (JST)")
+# --- 4. 画面表示 ---
+st.title("🦅 FX-AI Dashboard Ultra (Fixed)")
+jst_now = datetime.datetime.now() + datetime.timedelta(hours=9)
+st.caption(f"最終更新: {jst_now.strftime('%H:%M:%S')} (JST)")
 
-# メイン特大レート
-if current_price > 0:
+# メインレート
+data_main = fetch_fx_data_fixed("JPY=X", "2d", "1m")
+if data_main is not None:
+    current_price = float(data_main['Close'].iloc[-1])
     st.markdown(f"""
         <div style="background-color: #000000; padding: 15px; border-radius: 15px; text-align: center; border: 2px solid #00ff00; margin-bottom: 20px;">
             <p style="color: #00ff00; margin: 0; font-size: 1rem; letter-spacing: 2px;">USD/JPY リアルタイム</p>
@@ -108,49 +107,38 @@ if current_price > 0:
         </div>
     """, unsafe_allow_html=True)
 else:
-    st.error("データの取得に失敗しました。市場が閉まっていないか確認してください。")
+    st.error("現在レートを取得できません。")
+    current_price = 0.0
 
-if st.button('🔄 市場データを再学習して更新'): st.rerun()
+if st.button('🔄 データを更新'): st.rerun()
 
 st.divider()
 
-# 各時間軸の設定
-# 1日軸（1日）は1日前を確実にとるために期間を2年(2y)に設定
-timeframes = {
-    "10分": {"p": ("2d","1m",10), "o": 10, "d": False},
-    "1時間": {"p": ("7d","5m",12), "o": 12, "d": False},
-    "4時間": {"p": ("30d","15m",16), "o": 16, "d": False},
-    "1日": {"p": ("2y","1d",1), "o": 1, "d": True}
-}
-
-cols = st.columns(4)
-
-for i, (label, cfg) in enumerate(timeframes.items()):
-    with cols[i]:
-        st.markdown(f'<p class="time-header">{label}軸</p>', unsafe_allow_html=True)
-        
-        # 過去レートと最新予測の計算
-        p_val, _, _, _ = predict_engine_full("JPY=X", *cfg["p"], offset=cfg["o"], is_daily=cfg["d"])
-        _, f_dir, f_prob, f_rsi = predict_engine_full("JPY=X", *cfg["p"], offset=0, is_daily=cfg["d"])
-        
-        # 【実績比較】表示
-        st.markdown('<p class="section-label">これまでの動き</p>', unsafe_allow_html=True)
-        if p_val > 0:
-            diff = current_price - p_val
-            st.metric("", "📈 上昇中" if diff > 0 else "📉 下落中", f"{diff:+.2f}")
-            st.markdown(f'<p class="price-subtext">{p_val:.2f} → {current_price:.2f}</p>', unsafe_allow_html=True)
-        else:
-            st.metric("", "取得中", "")
-        
-        # 【AI予測】表示
-        st.markdown('<p class="section-label">AI最新予測</p>', unsafe_allow_html=True)
-        # 判定の厳格化（確信度53%未満は中立）
-        if max(f_prob) < 0.53:
-            st.metric("", "⚖️ 中立", "迷い")
-        else:
+if current_price > 0:
+    timeframes = {
+        "10分": {"p": ("2d","1m",10), "o": 10, "d": False},
+        "1時間": {"p": ("7d","5m",12), "o": 12, "d": False},
+        "4時間": {"p": ("14d","15m",16), "o": 16, "d": False},
+        "1日": {"p": ("1y","1d",1), "o": 1, "d": True}
+    }
+    
+    cols = st.columns(4)
+    for i, (label, cfg) in enumerate(timeframes.items()):
+        with cols[i]:
+            st.markdown(f'<p class="time-header">{label}軸</p>', unsafe_allow_html=True)
+            p_val, _, _, _ = predict_engine_full("JPY=X", *cfg["p"], offset=cfg["o"], is_daily=cfg["d"])
+            _, f_dir, f_prob, f_rsi = predict_engine_full("JPY=X", *cfg["p"], offset=0, is_daily=cfg["d"])
+            
+            # 【実績】
+            st.markdown('<p class="section-label">これまでの動き</p>', unsafe_allow_html=True)
+            if p_val > 0:
+                diff = current_price - p_val
+                st.metric("", "📈 上昇中" if diff > 0 else "📉 下落中", f"{diff:+.2f}")
+                st.markdown(f'<p class="price-subtext">{p_val:.2f} → {current_price:.2f}</p>', unsafe_allow_html=True)
+            else:
+                st.metric("", "計算中...", "")
+            
+            # 【予測】
+            st.markdown('<p class="section-label">AI予測</p>', unsafe_allow_html=True)
             st.metric("", "📈 上昇" if f_dir == 1 else "📉 下落", f"{max(f_prob)*100:.1f}%")
-        
-        st.markdown(f'<p class="tech-subtext">RSI: {f_rsi:.1f}</p>', unsafe_allow_html=True)
-
-st.divider()
-st.link_button("🌐 重要経済指標カレンダーを確認", "https://www.gaikaex.com/gaikaex/mark/calendar/", use_container_width=True)
+            st.markdown(f'<p style="color:#55aaff; font-size:0.75rem; text-align:center; margin-top:5px;">RSI: {f_rsi:.1f}</p>', unsafe_allow_html=True)
