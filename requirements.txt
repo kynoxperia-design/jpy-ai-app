@@ -1,5 +1,5 @@
+streamlit
 yfinance
 pandas
 scikit-learn
-streamlit
 pandas_ta
